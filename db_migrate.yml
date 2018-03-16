@@ -1,0 +1,59 @@
+---
+- hosts: sites
+  user: pc-01
+  vars:
+    current: "{{ lookup('pipe','date +%Y%m%d%H%m%S') }}"
+    code_dir: "/srv/www/releases/arkenea/{{ current }}" 
+    django_dir: " {{ code_dir }}/{{ project_name }}"
+    virtualenv_dir: "/srv/venv/{{ project_name }}"
+    db_user: "root"
+    db_backup_dir: "{{ backup_dir}}"
+- set_fact: 
+    backup_file_name: "{{ lookup('pipe','date +%Y-%m-%d_dbbackup') }}"
+
+# - debug: 
+#     msg: "backup: {{ backup_file_name }}"
+
+- name: dump database
+  shell: "mysqldump -u {{db_user}} -p --databases {{ db_name }} > {{db_backup_dir}}/{{backup_file_name}}.sql"
+  vars:
+    ansible_ssh_pipelining: true
+
+# Run migration on the application
+- name: Django migrate --fake
+  django_manage:
+    command: "migrate --noinput --fake"
+    app_path: "{{ django_dir }}"
+    #settings: "{{ settings_app_name }}"
+    #pythonpath: "{{ settings_app_name }}"
+    virtualenv: "{{ virtualenv_dir }}"
+
+#Run makemigration on the application
+- name: Django makemigration
+  django_manage:
+    command: "schemamigration {{ item }} --auto"
+    app_path: "{{ django_dir }}"
+    #settings: "{{ settings_app_name }}"
+    #pythonpath: "{{ settings_app_name }}"
+    virtualenv: "{{ virtualenv_dir }}"
+  with_items:
+    - core
+    - welgo
+
+# Run syncdb on the application
+- name: Django syncdb
+  django_manage:
+    command: syncdb
+    app_path: "{{ django_dir }}"
+    #settings: "{{ settings_app_name }}"
+    #pythonpath: "{{ settings_dir }}"
+    virtualenv: "{{ virtualenv_dir }}"
+
+# Run migration on the application
+- name: Django migrate
+  django_manage:
+    command: migrate
+    app_path: "{{ django_dir }}"
+    #settings: "{{ settings_app_name }}"
+    #pythonpath: "{{ settings_app_name }}"
+    virtualenv: "{{ virtualenv_dir }}"

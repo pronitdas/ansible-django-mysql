@@ -1,0 +1,2 @@
+[web]
+localhost ansible_connection=local ansible_become_user=pc-02 ansible_become_pass="123456" django_dir=~/Welgo/welgo-api/welgo virtualenv_dir=~/Welgo/welgo-api/welgoapi settings_app_name=welgo.settings db_user="root" db_name="welgoapi" db_backup_dir="~/Welgo/db_backup"

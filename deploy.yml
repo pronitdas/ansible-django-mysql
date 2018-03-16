@@ -1,0 +1,81 @@
+---
+- hosts: sites
+  user: pc-01
+  vars:
+    current: "{{ lookup('pipe','date +%Y%m%d%H%m') }}"
+    code_dir: "/srv/www/releases/arkenea/{{ current }}" 
+    repo: "{{ project_repo }}"
+    git_version: "master"
+    virtualenv_dir: "/srv/venv/{{project_name}}"
+
+  tasks:
+    - name: Create path to code directory
+      file: 
+        path: "{{ code_dir }}"
+        mode: 0755 
+        state: directory     
+
+    - name: Check if code directory exists
+      stat:
+        path: "{{ code_dir }}"
+      register: efs_dir
+          
+    - name: Clone repository      
+      git:
+        repo: "{{ repo }}"
+        dest: "{{ code_dir }}"
+        version: "{{ git_version }}"
+        force: yes
+        accept_hostkey: yes      
+
+    - name: Pull latest code
+      git:
+        repo: "{{ repo }}"
+        dest: "{{ code_dir }}"
+        version: "{{ git_version }}"
+        accept_hostkey: yes
+        force: yes
+        update: yes
+
+    - name: Install requirements      
+      become: True  
+      pip: 
+        requirements: " {{ code_dir }}/requirements.txt"
+        virtualenv: " {{ virtualenv_dir }} "
+        virtualenv_python: python2.7
+
+
+    - name: Copy app specific settings
+      copy: src="{{ location_of_settings.py }}" dest="{{location_of_settings.py}}"     
+    
+    - name: Copy app specific settings
+      copy: src="{{ location_of_wsgi.py.dist }}" dest="{{location_of_wsgi.py}}"   
+    
+      
+    - name: Start nginx
+      service: name=nginx state=started enabled=yes
+      become: True
+
+    - name: Create supervisord config folder
+      file: dest=/etc/supervisor state=directory owner=root
+      become: True
+
+    - name: Create supervisord config
+      template: src=supervisord.ini dest=/etc/supervisor/supervisord.ini
+      become: True
+
+    - name: Create supervisord service config
+      template: src=supervisord.conf dest=/etc/supervisord.conf
+      become: True
+
+    - name: Create supervisord init script
+      template: src=supervisord.sh dest=/etc/init.d/supervisord mode=0755
+      become: True
+
+    - name: create supervisor group
+      group: name=supervisor state=present
+      become: True  
+
+    - name: Start supervisord service and have it run during system startup
+      service: name=supervisord state=restarted enabled=yes
+      become: True  
